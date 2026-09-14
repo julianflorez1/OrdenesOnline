@@ -1,0 +1,93 @@
+from abc import ABC, abstractmethod
+from typing import Optional
+
+# 1. Objeto que viaja por la cadena
+class Request:
+    def __init__(self, ip: str, raw_data: str, credentials: str, role: str):
+        self.ip = ip
+        self.raw_data = raw_data
+        self.credentials = credentials
+        self.role = role
+
+# 2. Interfaz Handler
+class Handler(ABC):
+    @abstractmethod
+    def set_next(self, handler: 'Handler') -> 'Handler':
+        pass
+
+    @abstractmethod
+    def handle(self, request: Request) -> Optional[str]:
+        pass
+
+# 3. Base Handler para evitar repetir código de encadenamiento
+class BaseHandler(Handler):
+    def __init__(self):
+        self._next_handler: Handler = None
+
+    def set_next(self, handler: Handler) -> Handler:
+        self._next_handler = handler
+        # Retornamos el handler para permitir encadenamiento: a.set_next(b).set_next(c)
+        return handler
+
+    def handle(self, request: Request) -> Optional[str]:
+        if self._next_handler:
+            return self._next_handler.handle(request)
+        return None
+
+# 4. Handlers Concretos (Las verificaciones)
+class BruteForceHandler(BaseHandler):
+    def handle(self, request: Request) -> Optional[str]:
+        print("1. Verificando IP por ataques de fuerza bruta...")
+        if request.ip == "192.168.1.100": # IP quemada como ejemplo de bloqueo
+            return "Error: IP bloqueada por múltiples intentos fallidos."
+        return super().handle(request)
+
+class SanitizationHandler(BaseHandler):
+    def handle(self, request: Request) -> Optional[str]:
+        print("2. Saneando datos de entrada...")
+        request.raw_data = request.raw_data.strip().replace("<script>", "")
+        return super().handle(request)
+
+class AuthHandler(BaseHandler):
+    def handle(self, request: Request) -> Optional[str]:
+        print("3. Verificando autenticación y permisos...")
+        if request.credentials != "admin_token":
+            return "Error: Credenciales inválidas. Acceso denegado."
+        if request.role != "admin":
+            return "Error: Privilegios insuficientes."
+        return super().handle(request)
+
+class CacheHandler(BaseHandler):
+    def handle(self, request: Request) -> Optional[str]:
+        print("4. Verificando si existe respuesta en caché...")
+        if request.raw_data == "orden_repetida":
+            return "Éxito: Orden recuperada desde la caché."
+        
+        # Si pasó todo y no es caché, procesamos la orden final
+        return super().handle(request) or "Éxito: Orden creada en el sistema central."
+
+# 5. Código Cliente
+if __name__ == "__main__":
+    # Ensamblamos la cadena (esto se puede reutilizar en otros clientes)
+    brute_force = BruteForceHandler()
+    sanitizer = SanitizationHandler()
+    auth = AuthHandler()
+    cache = CacheHandler()
+
+    # Orden de ejecución: IP -> Saneamiento -> Auth -> Caché
+    brute_force.set_next(sanitizer).set_next(auth).set_next(cache)
+
+    print("--- Prueba 1: Petición Exitosa ---")
+    req1 = Request("10.0.0.1", " orden_nueva ", "admin_token", "admin")
+    resultado1 = brute_force.handle(req1)
+    print(resultado1)
+
+    print("\n--- Prueba 2: Falla por Fuerza Bruta ---")
+    req2 = Request("192.168.1.100", " orden_nueva ", "admin_token", "admin")
+    resultado2 = brute_force.handle(req2)
+    print(resultado2) # Se corta en el paso 1
+
+    print("\n--- Prueba 3: Falla por Autenticación ---")
+    req3 = Request("10.0.0.2", " orden_nueva ", "bad_token", "admin")
+    resultado3 = brute_force.handle(req3)
+    print(resultado3) # Se corta en el paso 3
