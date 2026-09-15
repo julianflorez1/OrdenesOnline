@@ -1,0 +1,20 @@
+# Análisis y toma de decisiones para el sistema de órdenes en línea 
+
+## Diagrama UML
+El diagrama (`diagrama_de_clases`) ilustra cómo aislamos cada validación para que no sea un bloque de `if`s muy grande. Si en la evolución del proyecto piden agregar otro filtro, 
+solo es necesario agregar el nuevo componente en la estructura del código. Con esto evitamos tocar el desarrollo del cliente y de los demás filtros, 
+y así evitamos adquirir deudas técnicas desde el diseño.
+
+## Patrones de Desarrollo
+
+El patrón recomendado es **Chain of Responsibility** (Cadena de Responsabilidad).
+
+### Justificación
+Este patrón de comportamiento permite pasar solicitudes a lo largo de una cadena de manejadores. Al recibir una solicitud, cada manejador decide si la procesa (o rechaza) 
+y si la pasa al siguiente manejador de la cadena. Se ajusta perfectamente porque nos permite detener el flujo en cualquier punto (ej. si falla la validación de IP) 
+y nos permite apilar dinámicamente tantos filtros como queramos sin tocar el código del cliente.
+
+### Roles de los elementos en este patrón:
+* **Handler** (Interfaz / Clase Abstracta): Define el contrato estándar para todos los manejadores.
+* **Concrete Handlers** (Manejadores Concretos): Implementan la lógica de validación específica (Autenticación, IP, etc.).
+* **Client** (Cliente): Ensambla la cadena y envía la petición inicial.
